@@ -16,12 +16,6 @@ from .midi_utils import midi_utils
 from . import performanceWorm as perf_worm, xml_direction_encoding as dir_enc, \
     score_as_graph as score_graph, xml_midi_matching as matching
 from . import pedal_cleaning
-# import sys
-# # sys.setdefaultencoding() does not exist, here!
-# reload(sys)  # Reload does the trick!
-# sys.setdefaultencoding('UTF8')
-# from . import midi_utils
-# import performance_evaluation
 from binary_index import binary_index
 
 NUM_SCORE_NOTES = 0
@@ -155,14 +149,14 @@ def extract_score_features(xml_notes, measure_positions, beats=None, qpm_primo=0
         # feature.duration = note.note_duration.duration / measure_length
         feature.duration = note.note_duration.duration / note.state_fixed.divisions
         # feature.duration_ratio = calculate_duration_ratio(xml_notes, i)
-        pitch_interval, feature.duration_ratio = cal_pitch_interval_and_duration_ratio(xml_notes, i)
+        # pitch_interval, feature.duration_ratio = cal_pitch_interval_and_duration_ratio(xml_notes, i)
         # feature.pitch_interval = pitch_interval_into_vector(pitch_interval)
-        if pitch_interval is None:
-            feature.pitch_interval = 0
-            feature.no_following_note = 1
-        else:
-            feature.pitch_interval = pitch_interval
-            feature.no_following_note = 0
+        # if pitch_interval is None:
+        #     feature.pitch_interval = 0
+        #     feature.no_following_note = 1
+        # else:
+        #     feature.pitch_interval = pitch_interval
+        #     feature.no_following_note = 0
 
         beat_position = (note_position - measure_positions[measure_index]) / measure_length
         feature.beat_position = beat_position
@@ -327,12 +321,15 @@ def extract_perform_features(xml_doc, xml_notes, pairs, perf_midi, measure_posit
             feature.soft_pedal = pedal_sigmoid(pairs[i]['midi'].soft_pedal)
 
             if feature.pedal_at_end > 70:
-                feature.articulation_loss_weight = 0.1
+                feature.articulation_loss_weight = 0.05
             elif feature.pedal_at_end > 60:
                 feature.articulation_loss_weight = 0.5
             else:
                 feature.articulation_loss_weight = 1
 
+            if feature.pedal_at_end > 64 and feature.pedal_refresh < 64:
+                # pedal refresh occurs in the note
+                feature.articulation_loss_weight = 1
 
             feature.midi_start = pairs[i]['midi'].start # just for reproducing and testing perform features
 
@@ -629,6 +626,13 @@ def cal_beat_importance(beat_position, numerator):
         beat_importance = 1
     elif (beat_position * 12) % 1 == 0 and numerator in [3, 6, 12]:
         beat_importance = 0.5
+    elif numerator == 7:
+        if abs((beat_position * 7) - 2) < 0.001:
+            beat_importance = 2
+        elif abs((beat_position * 5) - 2) < 0.001:
+            beat_importance = 2
+        else:
+            beat_importance = 0
     else:
         beat_importance = 0
     return beat_importance
@@ -666,13 +670,16 @@ def load_pairs_from_folder(path, pedal_elongate=False):
     global NUM_NON_MATCHED_NOTES
     global NUM_PERF_NOTES
 
-    xml_name = path+'musicxml_cleaned.musicxml'
     score_midi_name = path+'midi_cleaned.mid'
-    composer_name = copy.copy(path).split('/')[1]
+    path_split = copy.copy(path).split('/')
+    if path_split[0] == 'chopin_cleaned':
+        composer_name = copy.copy(path).split('/')[1]
+    else:
+        dataset_folder_name_index = path_split.index('chopin_cleaned')
+        composer_name = copy.copy(path).split('/')[dataset_folder_name_index+1]
     composer_name_vec = composer_name_to_vec(composer_name)
 
-    XMLDocument = MusicXMLDocument(xml_name)
-    xml_notes = get_direction_encoded_notes(XMLDocument)
+    XMLDocument, xml_notes = read_xml_to_notes(path)
     score_midi = midi_utils.to_midi_zero(score_midi_name)
     score_midi_notes = score_midi.instruments[0].notes
     score_midi_notes.sort(key=lambda x:x.start)
@@ -721,6 +728,29 @@ def load_pairs_from_folder(path, pedal_elongate=False):
     if perform_features_piece == []:
         return None
     return perform_features_piece
+
+
+def convert_features_to_vector(features, composer_vec):
+    score_features = []
+    perform_features = []
+    for feature in features:
+        score_features.append(
+            [feature.midi_pitch, feature.duration, feature.beat_importance, feature.measure_length,
+             feature.qpm_primo, feature.following_rest, feature.distance_from_abs_dynamic,
+             feature.distance_from_recent_tempo, feature.beat_position, feature.xml_position,
+             feature.grace_order, feature.preceded_by_grace_note, feature.followed_by_fermata_rest]
+            + feature.pitch + feature.tempo + feature.dynamic + feature.time_sig_vec +
+            feature.slur_beam_vec + composer_vec + feature.notation + feature.tempo_primo)
+
+        perform_features.append(
+            [feature.qpm, feature.velocity, feature.xml_deviation,
+             feature.articulation, feature.pedal_refresh_time, feature.pedal_cut_time,
+             feature.pedal_at_start, feature.pedal_at_end, feature.soft_pedal,
+             feature.pedal_refresh,
+             feature.pedal_cut, feature.qpm, feature.beat_dynamic, feature.measure_tempo, feature.measure_dynamic] \
+            + feature.trill_param)
+
+    return score_features, perform_features
 
 
 def make_midi_measure_seconds(pairs, measure_positions):
@@ -911,6 +941,48 @@ def applyIOI(xml_notes, midi_notes, features, feature_list):
 #             betw_note.note_duration.seconds = max(offset_time - betw_note.note_duration.time_position, 0.05)
 #
 #     return xml_notes
+
+
+def model_prediction_to_feature(prediction):
+    output_features = []
+    num_notes = len(prediction)
+    for i in range(num_notes):
+        pred = prediction[i]
+        # feat = {'IOI_ratio': pred[0], 'articulation': pred[1], 'loudness': pred[2], 'xml_deviation': 0,
+        feat = MusicFeature()
+        feat.qpm = pred[0]
+        feat.velocity = pred[1]
+        feat.xml_deviation = pred[2]
+        feat.articulation = pred[3]
+        feat.pedal_refresh_time = pred[4]
+        feat.pedal_cut_time = pred[5]
+        feat.pedal_at_start = pred[6]
+        feat.pedal_at_end = pred[7]
+        feat.soft_pedal = pred[8]
+        feat.pedal_refresh = pred[9]
+        feat.pedal_cut = pred[10]
+
+        feat.trill_param = pred[11:16]
+        feat.trill_param[0] = feat.trill_param[0]
+        feat.trill_param[1] = (feat.trill_param[1])
+        feat.trill_param[2] = (feat.trill_param[2])
+        feat.trill_param[3] = (feat.trill_param[3])
+        feat.trill_param[4] = round(feat.trill_param[4])
+
+        # if test_x[i][is_trill_index_score] == 1:
+        #     print(feat.trill_param)
+        output_features.append(feat)
+
+    return output_features
+
+
+def add_note_location_to_features(features, note_locations):
+    for feat, loc in zip(features, note_locations):
+        feat.note_location.beat = loc.beat
+        feat.note_location.measure = loc.measure
+    return features
+
+
 
 def apply_tempo_perform_features(xml_doc, xml_notes, features, start_time=0, predicted=False):
     beats = xml_doc.get_beat_positions()
@@ -1391,6 +1463,7 @@ def apply_feat_to_a_note(note, feat, prev_vel):
         note.pedal.soft = int(round(feat.soft_pedal))
     return note, prev_vel
 
+
 def make_new_note(note, time_a, time_b, articulation, loudness, default_velocity):
     index = binary_index(time_a, note.start)
     new_onset = cal_new_onset(note.start, time_a, time_b)
@@ -1429,28 +1502,44 @@ def interpolation(a, list1, list2, index):
 def save_midi_notes_as_piano_midi(midi_notes, midi_pedals, output_name, bool_pedal=False, disklavier=False):
     piano_midi = pretty_midi.PrettyMIDI()
     piano_program = pretty_midi.instrument_name_to_program('Acoustic Grand Piano')
-    piano = pretty_midi.Instrument(program=piano_program)
-    # pedal_threhsold = 60
-    # pedal_time_margin = 0.2
+    if isinstance(midi_notes[0], list): #multi instruments
+        num_instruments = len(midi_notes)
+        for i in range(num_instruments):
+            piano = pretty_midi.Instrument(program=piano_program)
+            for note in midi_notes[i]:
+                piano.notes.append(note)
+            last_note_end = midi_notes[i][-1].end
+            if bool_pedal:
+                for pedal in midi_pedals[i]:
+                    if pedal.value < pedal_cleaning.THRESHOLD:
+                        pedal.value = 0
+            last_pedal = pretty_midi.ControlChange(number=64, value=0, time=last_note_end + 3)
+            midi_pedals[i].append(last_pedal)
+            piano.control_changes = midi_pedals[i]
+            piano_midi.instruments.append(piano)
 
-    for note in midi_notes:
-        piano.notes.append(note)
+        # last_note_end = max([x[-1].end for x in midi_notes])
 
-    piano_midi.instruments.append(piano)
+    else:
+        piano = pretty_midi.Instrument(program=piano_program)
+        # pedal_threhsold = 60
+        # pedal_time_margin = 0.2
+        for note in midi_notes:
+            piano.notes.append(note)
 
+        piano_midi.instruments.append(piano)
+        last_note_end = midi_notes[-1].end
     # piano_midi = midi_utils.save_note_pedal_to_CC(piano_midi)
 
-    if bool_pedal:
-        for pedal in midi_pedals:
-            if pedal.value < pedal_cleaning.THRESHOLD:
-                pedal.value = 0
+        if bool_pedal:
+            for pedal in midi_pedals:
+                if pedal.value < pedal_cleaning.THRESHOLD:
+                    pedal.value = 0
+        # end pedal 3 seconds after the last note
+        last_pedal = pretty_midi.ControlChange(number=64, value=0, time=last_note_end + 3)
+        midi_pedals.append(last_pedal)
 
-    last_note_end = midi_notes[-1].end
-    # end pedal 3 seconds after the last note
-    last_pedal = pretty_midi.ControlChange(number=64, value=0, time=last_note_end + 3)
-    midi_pedals.append(last_pedal)
-
-    piano_midi.instruments[0].control_changes = midi_pedals
+        piano_midi.instruments[0].control_changes = midi_pedals
 
     #
     # if disklavier:
@@ -1639,16 +1728,21 @@ def time_signature_to_vector(time_signature):
     return numerator_vec + denominator_vec
 
 
-def xml_notes_to_midi(xml_notes):
-    midi_notes = []
+def xml_notes_to_midi(xml_notes, multi_instruments=False):
+    if multi_instruments:
+        num_instruments = max([x.voice for x in xml_notes]) // 10 + 1
+        midi_notes = [ [] for i in range(num_instruments) ]
+    else:
+        midi_notes = []
+    
     for note in xml_notes:
-        if note.is_overlapped: # ignore overlapped notes.
+        if note.is_overlapped and not multi_instruments:  # ignore overlapped notes.
             continue
-
+        
         pitch = note.pitch[1]
         start = note.note_duration.time_position
         end = start + note.note_duration.seconds
-        if note.note_duration.seconds <0.005:
+        if note.note_duration.seconds < 0.005:
             end = start + 0.005
         elif note.note_duration.seconds > 10:
             end = start + 10
@@ -1662,10 +1756,19 @@ def xml_notes_to_midi(xml_notes):
         # midi_note.pedal_cut = note.pedal.cut
         # midi_note.pedal_cut_time = note.pedal.cut_time
         # midi_note.soft_pedal = note.pedal.soft
-
-        midi_notes.append(midi_note)
-
-    midi_pedals = pedal_cleaning.predicted_pedals_to_midi_pedals(xml_notes)
+        if multi_instruments:
+            instrument_idx = note.voice // 10
+            midi_notes[instrument_idx].append(midi_note)
+        else:
+            midi_notes.append(midi_note)
+    if multi_instruments:
+        midi_pedals = []
+        for i in range(num_instruments):
+            notes = [note for note in xml_notes if (note.voice//10)==i]
+            pedals = pedal_cleaning.predicted_pedals_to_midi_pedals(notes)
+            midi_pedals.append(pedals)
+    else:
+        midi_pedals = pedal_cleaning.predicted_pedals_to_midi_pedals(xml_notes)
 
     return midi_notes, midi_pedals
 
@@ -1680,14 +1783,18 @@ def check_pairs(pairs):
     return non_matched
 
 
-def read_xml_to_array(path_name, means, stds, start_tempo, composer_name, vel_standard):
-    xml_name = path_name + 'musicxml_cleaned.musicxml'
-
+def read_xml_to_notes(path):
+    xml_name = path + 'musicxml_cleaned.musicxml'
     if not os.path.isfile(xml_name):
-        xml_name = path_name + 'xml.xml'
-
+        xml_name = path + 'xml.xml'
     xml_object = MusicXMLDocument(xml_name)
     xml_notes = get_direction_encoded_notes(xml_object)
+
+    return xml_object, xml_notes
+
+
+def read_xml_to_array(path_name, means, stds, start_tempo, composer_name, vel_standard):
+    xml_object, xml_notes = read_xml_to_notes(path_name)
     beats = xml_object.get_beat_positions()
     measure_positions = xml_object.get_measure_positions()
     features = extract_score_features(xml_notes, measure_positions, beats, qpm_primo=start_tempo, vel_standard=vel_standard)
@@ -1731,6 +1838,7 @@ def find_tempo_change(xml_notes):
 
     tempo_change_positions.append(xml_notes[-1].note_duration.xml_position+0.1)
     return tempo_change_positions
+
 
 class Tempo:
     def __init__(self, xml_position, qpm, time_position, end_xml, end_time):
@@ -2303,16 +2411,12 @@ def composer_name_to_vec(composer_name):
 
 
 def read_score_perform_pair(path, perf_name, composer_name, means, stds):
-    xml_name = path + 'musicxml_cleaned.musicxml'
     score_midi_name = path + 'midi_cleaned.mid'
 
-    if not os.path.isfile(xml_name):
-        xml_name = path + 'xml.xml'
+    if not os.path.isfile(score_midi_name):
         score_midi_name = path + 'midi.mid'
 
-    xml_object = MusicXMLDocument(xml_name)
-    xml_notes = get_direction_encoded_notes(xml_object)
-
+    xml_object, xml_notes = read_xml_to_notes(path)
     score_midi = midi_utils.to_midi_zero(score_midi_name)
     score_midi_notes = score_midi.instruments[0].notes
     score_midi_notes.sort(key=lambda x:x.start)
@@ -2480,100 +2584,6 @@ def cal_correlation_of_pairs_in_folder(path):
     return correlation_result_total
 
 
-def make_slicing_indexes_by_measure(num_notes, measure_numbers, steps, overlap=True):
-    slice_indexes = []
-    if num_notes < steps:
-        slice_indexes.append((0, num_notes))
-    elif overlap:
-        first_end_measure = measure_numbers[steps]
-        last_measure = measure_numbers[-1]
-        if first_end_measure < last_measure - 1:
-            first_note_after_the_measure = measure_numbers.index(first_end_measure+1)
-            slice_indexes.append((0, first_note_after_the_measure))
-            second_end_start_measure = measure_numbers[num_notes - steps]
-            first_note_of_the_measure = measure_numbers.index(second_end_start_measure)
-            slice_indexes.append((first_note_of_the_measure, num_notes))
-
-            if num_notes > steps * 2:
-                first_start = random.randrange(int(steps/2), int(steps*1.5))
-                start_measure = measure_numbers[first_start]
-                end_measure = start_measure
-
-                while end_measure < second_end_start_measure:
-                    start_note = measure_numbers.index(start_measure)
-                    if start_note+steps < num_notes:
-                        end_measure = measure_numbers[start_note+steps]
-                    else:
-                        break
-                    end_note = measure_numbers.index(end_measure-1)
-                    slice_indexes.append((start_note, end_note))
-
-                    if end_measure > start_measure + 2:
-                        start_measure = end_measure - 2
-                    elif end_measure > start_measure + 1:
-                        start_measure = end_measure - 1
-                    else:
-                        start_measure = end_measure
-        else:
-            slice_indexes.append((0, num_notes))
-    else:
-        num_slice = math.ceil(num_notes / steps)
-        prev_end_index = 0
-        for i in range(num_slice):
-            if prev_end_index + steps >= num_notes:
-                slice_indexes.append((prev_end_index, num_notes))
-                break
-            end_measure = measure_numbers[prev_end_index + steps]
-            if end_measure >= measure_numbers[-1]:
-                slice_indexes.append((prev_end_index, num_notes))
-                break
-            first_note_after_the_measure = measure_numbers.index(end_measure + 1)
-            slice_indexes.append((prev_end_index, first_note_after_the_measure))
-            prev_end_index = first_note_after_the_measure
-    return slice_indexes
-
-
-def make_slicing_indexes_by_beat(beat_numbers, beat_steps, overlap=True):
-    slice_indexes = []
-    num_notes = len(beat_numbers)
-    num_beats = beat_numbers[-1]
-    if num_beats < beat_steps:
-        slice_indexes.append((0, num_notes))
-    elif overlap:
-        first_end_beat = beat_steps
-        last_end_beat = num_beats
-
-        if first_end_beat < last_end_beat - 1:
-            first_note_after_the_beat = beat_numbers.index(first_end_beat + 1)
-            slice_indexes.append((0, first_note_after_the_beat))
-            second_end_start_beat = num_beats - beat_steps
-            first_note_of_the_beat = beat_numbers.index(second_end_start_beat)
-            slice_indexes.append((first_note_of_the_beat, num_notes))
-            if num_beats > beat_steps * 2:
-                first_start = random.randrange(int(beat_steps / 2), int(beat_steps * 1.5))
-                start_beat = first_start
-                end_beat = start_beat
-
-                while end_beat < second_end_start_beat:
-                    start_note = beat_numbers.index(start_beat)
-                    if start_beat + beat_steps < num_beats:
-                        end_beat = start_beat + beat_steps
-                    else:
-                        break
-                    end_note = beat_numbers.index(end_beat)
-                    slice_indexes.append((start_note, end_note))
-
-                    if end_beat > start_beat + 2:
-                        start_beat = end_beat - 2
-                    elif end_beat > start_beat + 1:
-                        start_beat = end_beat - 1
-                    else:
-                        start_beat = end_beat
-
-        else:
-            slice_indexes.append((0, num_notes))
-    return slice_indexes
-
 def cal_actual_note_articulation(path):
     features_in_folder = load_pairs_from_folder(path, pedal_elongate=True)
     for feat in features_in_folder:
@@ -2581,7 +2591,6 @@ def cal_actual_note_articulation(path):
         articulations = []
         for i in range(num_notes):
             pass
-
 
 
 def check_data_split(path):
@@ -2599,10 +2608,7 @@ def check_data_split(path):
     num_notes_in_test = 0
 
     def load_pairs_and_add_num_notes(path):
-        xml_name = path + 'musicxml_cleaned.musicxml'
-
-        XMLDocument = MusicXMLDocument(xml_name)
-        xml_notes = XMLDocument.get_notes()
+        xml_object, xml_notes = read_xml_to_notes(path)
         filenames = os.listdir(path)
         perform_features_piece = []
 
@@ -2677,3 +2683,6 @@ def check_data_split(path):
     print('Number of train notes: ', num_notes_in_train, 'valid notes: ', num_notes_in_valid, 'test notes: ',
           num_notes_in_test)
     return entire_pairs, num_train_pairs, num_valid_pairs, num_test_pairs
+
+
+

@@ -2,7 +2,7 @@ import copy
 
 absolute_tempos_keywords = ['adagio', 'grave', 'lento', 'largo', 'larghetto', 'andante', 'andantino', 'moderato',
                             'allegretto', 'allegro', 'vivace', 'accarezzevole', 'languido', 'tempo giusto', 'mesto',
-                            'presto', 'prestissimo', 'maestoso', 'lullaby', 'doppio movimento', 'agitato'
+                            'presto', 'prestissimo', 'maestoso', 'lullaby', 'doppio movimento', 'agitato', 'precipitato',
                             'leicht und zart', 'aufgeregt', 'bewegt', 'rasch', 'innig', 'lebhaft', 'geschwind',
                             "d'un rythme souple",
                             'lent', 'large', 'vif', 'animé', 'scherzo', 'menuetto', 'minuetto']
@@ -232,16 +232,18 @@ def get_tempos(directions):
                 if next_rel in relative_long_tempos:
                     rel.end_xml_position = next_rel.xml_position
                     break
-        index = binaryIndex(absolute_tempos_position, rel.xml_position)
-        rel.previous_tempo = absolute_tempos[index].type['content']
-        if index+1 < num_abs_tempos:
-            rel.next_tempo = absolute_tempos[index+1].type['content']
-            if not hasattr(rel, 'end_xml_position') or rel.end_xml_position > absolute_tempos_position[index+1]:
-                rel.end_xml_position = absolute_tempos_position[index+1]
+        if len(absolute_tempos)> 0:
+            index = binaryIndex(absolute_tempos_position, rel.xml_position)
+            rel.previous_tempo = absolute_tempos[index].type['content']
+            if index+1 < num_abs_tempos:
+                rel.next_tempo = absolute_tempos[index+1].type['content']
+                if not hasattr(rel, 'end_xml_position') or rel.end_xml_position > absolute_tempos_position[index+1]:
+                    rel.end_xml_position = absolute_tempos_position[index+1]
         if not hasattr(rel, 'end_xml_position'):
             rel.end_xml_position = float("inf")
 
     return absolute_tempos, relative_tempos
+
 
 
 def word_regularization(word):
@@ -491,6 +493,7 @@ def define_tempo_embedding_table():
     embed_table.append(EmbeddingKey('molto vivace', 0, 0.7))
     embed_table.append(EmbeddingKey('vivace assai', 0, 0.7))
     embed_table.append(EmbeddingKey('presto', 0, 0.8))
+    embed_table.append(EmbeddingKey('precipitato', 0, 0.8))
     embed_table.append(EmbeddingKey('prestissimo', 0, 0.9))
 
     embed_table.append(EmbeddingKey('doppio movimento', 0, 0.6))
