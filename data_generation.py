@@ -10,16 +10,16 @@ import os
 from . import xml_matching as xml_matching
 from . import dataset_split as split
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--regression', default=True, type=lambda x: (str(x).lower() == 'true'))
+# parser = argparse.ArgumentParser()
+# parser.add_argument('--regression', default=True, type=lambda x: (str(x).lower() == 'true'))
 
-args = parser.parse_args()
+# args = parser.parse_args()
 
 
 NUM_TRILL_PARAM = 5
 NUM_NORMALIZE_FEATURE = [8, 19, 4]
-REGRESSION = args.regression
-print('Data type is regression: ', args.regression)
+REGRESSION = True
+print('Data type is regression: ', REGRESSION)
 
 VALID_LIST = split.VALID_LIST
 TEST_LIST = split.TEST_LIST
@@ -310,5 +310,5 @@ def load_entire_subfolder(path, minimum_perform_limit=0):
 
 
 # xml_matching.check_data_split('chopin_cleaned/')
-chopin_pairs, num_train_pairs, num_valid_pairs, num_test_pairs = load_entire_subfolder('pyScoreParser/chopin_cleaned/', 4)
-save_features_as_vector(chopin_pairs, num_train_pairs, num_valid_pairs, 'perform_style_set_5')
+# chopin_pairs, num_train_pairs, num_valid_pairs, num_test_pairs = load_entire_subfolder('pyScoreParser/chopin_cleaned/', 4)
+# save_features_as_vector(chopin_pairs, num_train_pairs, num_valid_pairs, 'perform_style_set_5')
