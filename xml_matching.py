@@ -16,7 +16,7 @@ from .midi_utils import midi_utils
 from . import performanceWorm as perf_worm, xml_direction_encoding as dir_enc, \
     score_as_graph as score_graph, xml_midi_matching as matching
 from . import pedal_cleaning
-from binary_index import binary_index
+from .binary_index import binary_index
 
 NUM_SCORE_NOTES = 0
 NUM_PERF_NOTES = 0
