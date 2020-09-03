@@ -25,7 +25,7 @@ print('Data type is regression: ', REGRESSION)
 VALID_LIST = split.VALID_LIST
 TEST_LIST = split.TEST_LIST
 
-def save_features_as_vector(dataset, num_train, num_valid, save_name):
+def convert_features_to_vector(dataset, num_train, num_valid):
     complete_xy = []
     num_total_datapoint = 0
     total_notes = 0
@@ -92,20 +92,25 @@ def save_features_as_vector(dataset, num_train, num_valid, save_name):
             if std == 0:
                 print('STD of ' + str(index1) + ',' + str(index2) + ' is zero')
 
+    ret = {'train': complete_xy_train, 'valid': complete_xy_valid, 'test': complete_xy_test}
+    return ret
+
+def save_features_as_vector(save_obj, save_name):
+    print(os.path.abspath(save_name))
     with open(save_name + ".dat", "wb") as f:
-        pickle.dump({'train': complete_xy_train, 'valid': complete_xy_valid}, f, protocol=2)
+        pickle.dump({'train': save_obj['train'], 'valid': save_obj['valid']}, f, protocol=2)
     with open(save_name + "_test.dat", "wb") as f:
-        pickle.dump(complete_xy_test, f, protocol=2)
+        pickle.dump(save_obj['test'], f, protocol=2)
 
-    if REGRESSION:
-        with open(save_name + "_stat.dat", "wb") as f:
-            pickle.dump([means, stds], f, protocol=2)
-    else:
-        with open(save_name + "_stat.dat", "wb") as f:
-            pickle.dump([means, stds, bins], f, protocol=2)
+    # if REGRESSION:
+    #     with open(save_name + "_stat.dat", "wb") as f:
+    #         pickle.dump([means, stds], f, protocol=2)
+    # else:
+    #     with open(save_name + "_stat.dat", "wb") as f:
+    #         pickle.dump([means, stds, bins], f, protocol=2)
 
-    num_output = len(complete_xy[0][1][0])
-    print(num_input, num_output)
+    # num_output = len(complete_xy[0][1][0])
+    # print(num_input, num_output)
 
 
 def get_mean_and_sd(performances, target_data, target_dimension):
