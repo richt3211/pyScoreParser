@@ -22,8 +22,6 @@ NUM_NORMALIZE_FEATURE = [8, 19, 4]
 REGRESSION = True
 print('Data type is regression: ', REGRESSION)
 
-VALID_LIST = split.VALID_LIST
-TEST_LIST = split.TEST_LIST
 
 def convert_features_to_vector(dataset, num_train, num_valid):
     complete_xy = []
@@ -92,22 +90,23 @@ def convert_features_to_vector(dataset, num_train, num_valid):
             if std == 0:
                 print('STD of ' + str(index1) + ',' + str(index2) + ' is zero')
 
-    ret = {'train': complete_xy_train, 'valid': complete_xy_valid, 'test': complete_xy_test}
-    return ret
+    data = {'train': complete_xy_train, 'valid': complete_xy_valid, 'test': complete_xy_test}
+    stats = {'means': means, 'stds': stds, 'bins': bins}
+    return data, stats
 
-def save_features_as_vector(save_obj, save_name):
+def save_features_as_vector(data, stats, save_name):
     print(os.path.abspath(save_name))
     with open(save_name + ".dat", "wb") as f:
-        pickle.dump({'train': save_obj['train'], 'valid': save_obj['valid']}, f, protocol=2)
+        pickle.dump({'train': data['train'], 'valid': data['valid']}, f, protocol=2)
     with open(save_name + "_test.dat", "wb") as f:
-        pickle.dump(save_obj['test'], f, protocol=2)
+        pickle.dump(data['test'], f, protocol=2)
 
-    # if REGRESSION:
-    #     with open(save_name + "_stat.dat", "wb") as f:
-    #         pickle.dump([means, stds], f, protocol=2)
-    # else:
-    #     with open(save_name + "_stat.dat", "wb") as f:
-    #         pickle.dump([means, stds, bins], f, protocol=2)
+    if REGRESSION:
+        with open(save_name + "_stat.dat", "wb") as f:
+            pickle.dump([stats['means'], stats['stds']], f, protocol=2)
+    else:
+        with open(save_name + "_stat.dat", "wb") as f:
+            pickle.dump([stats['means'], stats['stds'], stats['bins']], f, protocol=2)
 
     # num_output = len(complete_xy[0][1][0])
     # print(num_input, num_output)
@@ -252,22 +251,6 @@ def key_augmentation(data_x, key_change):
 
     return data_x_aug
 
-def get_train_val_test_lists(path):
-    # path = "../../../chopin_cleaned"
-    midi_list = []
-    if path[len(path)-1] != "/":
-        path = f'{path}/'
-    for dp,_,filenames in os.walk(path):
-        # print(dp)
-        for f in filenames:
-            if f == "midi_cleaned.mid":
-                midi_file = dp.replace(path, "")
-                midi_list.append(midi_file)
-
-    train_list = [os.path.join(path,f) for f in midi_list if f not in VALID_LIST and f not in TEST_LIST]
-    valid_list = [os.path.join(path, f) for f in VALID_LIST]
-    test_list = [os.path.join(path,f) for f in TEST_LIST]
-    return (train_list, valid_list, test_list)
 
 def get_piece_pairs(folder_list, minimum_perform_limit, entire_pairs):
     num_pairs = 0
@@ -288,36 +271,6 @@ def get_piece_pairs(folder_list, minimum_perform_limit, entire_pairs):
                 print(piece_pairs)
     return (entire_pairs, num_pairs)
 
-def load_limited_subfolder(path, train_list, valid_list, test_list, minimum_perform_limit):
-    train_list_folder = [os.path.join(path,f) for f in train_list]
-    valid_list_folder = [os.path.join(path, f) for f in valid_list]
-    test_list_folder = [os.path.join(path,f) for f in test_list]
-
-    return load_lists(train_list_folder, valid_list_folder, test_list_folder, minimum_perform_limit)
-
-def load_entire_subfolder(path, minimum_perform_limit=0):
-    (train_list, valid_list, test_list) = get_train_val_test_lists(path)
-
-    return load_lists(train_list, valid_list, test_list, minimum_perform_limit)
-
-def load_lists(train_list, valid_list, test_list, minimum_perform_limit):
-    # display(train_list)
-    entire_pairs = []
-    try: 
-        (entire_pairs, num_train_pairs) = get_piece_pairs(train_list, minimum_perform_limit, entire_pairs)
-        (entire_pairs, num_valid_pairs) = get_piece_pairs(valid_list, minimum_perform_limit, entire_pairs)
-        (entire_pairs, num_test_pairs) = get_piece_pairs(test_list, minimum_perform_limit, entire_pairs)
-    except: 
-            print()
-            print("Error reading the training data")
-            traceback.print_exc()
-            print()
-
-    print('Number of train pairs: ', num_train_pairs, 'valid pairs: ', num_valid_pairs, 'test pairs: ', num_test_pairs)
-    # print('Number of total score notes, performance notes, non matched notes, excluded notes: ', NUM_SCORE_NOTES, NUM_PERF_NOTES, NUM_NON_MATCHED_NOTES, NUM_EXCLUDED_NOTES)
-    return entire_pairs, num_train_pairs, num_valid_pairs, num_test_pairs
-
-    
 
 # xml_matching.check_data_split('chopin_cleaned/')
 # chopin_pairs, num_train_pairs, num_valid_pairs, num_test_pairs = load_entire_subfolder('pyScoreParser/chopin_cleaned/', 4)
