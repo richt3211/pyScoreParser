@@ -91,7 +91,9 @@ def convert_features_to_vector(dataset, num_train, num_valid):
                 print('STD of ' + str(index1) + ',' + str(index2) + ' is zero')
 
     data = {'train': complete_xy_train, 'valid': complete_xy_valid, 'test': complete_xy_test}
-    stats = {'means': means, 'stds': stds, 'bins': bins}
+    stats = {'means': means, 'stds': stds}
+    if not REGRESSION:
+        stats['bins'] = bins
     return data, stats
 
 def save_features_as_vector(data, stats, save_name):
