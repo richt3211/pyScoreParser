@@ -259,18 +259,23 @@ def get_piece_pairs(folder_list, minimum_perform_limit, entire_pairs):
     for folder in folder_list:
         # print(f'file: {folder}')
         foldername = os.path.split(folder)[0] + '/'
-        # print(f'foldername: {foldername}')
+        # print(f'folder: {folder}')
         xml_name = folder + 'musicxml_cleaned.musicxml'
-
+        # print(xml_name)
         if os.path.isfile(xml_name):
             print(foldername)
-            piece_pairs = xml_matching.load_pairs_from_folder(foldername)
-            if piece_pairs is not None and len(piece_pairs) > minimum_perform_limit:
-                entire_pairs.append(piece_pairs)
-                num_pairs += len(piece_pairs)
-            else:
-                print(len(piece_pairs))
-                print(piece_pairs)
+            try: 
+                piece_pairs = xml_matching.load_pairs_from_folder(foldername)
+                if piece_pairs is not None and len(piece_pairs) > minimum_perform_limit:
+                    entire_pairs.append(piece_pairs)
+                    num_pairs += len(piece_pairs)
+                else:
+                    print(len(piece_pairs))
+            except: 
+                print()
+                print('Error reading data')
+                traceback.print_exc()
+                print()
     return (entire_pairs, num_pairs)
 
 
