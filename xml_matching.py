@@ -964,12 +964,12 @@ def model_prediction_to_feature(prediction):
         feat.pedal_refresh = pred[9]
         feat.pedal_cut = pred[10]
 
-        feat.trill_param = pred[11:16]
-        feat.trill_param[0] = feat.trill_param[0]
-        feat.trill_param[1] = (feat.trill_param[1])
-        feat.trill_param[2] = (feat.trill_param[2])
-        feat.trill_param[3] = (feat.trill_param[3])
-        feat.trill_param[4] = round(feat.trill_param[4])
+        # feat.trill_param = pred[11:16]
+        # feat.trill_param[0] = feat.trill_param[0]
+        # feat.trill_param[1] = (feat.trill_param[1])
+        # feat.trill_param[2] = (feat.trill_param[2])
+        # feat.trill_param[3] = (feat.trill_param[3])
+        # feat.trill_param[4] = round(feat.trill_param[4])
 
         # if test_x[i][is_trill_index_score] == 1:
         #     print(feat.trill_param)
