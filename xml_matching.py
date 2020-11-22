@@ -1107,100 +1107,102 @@ def apply_tempo_perform_features(xml_doc, xml_notes, features, start_time=0, pre
         end_note.note_duration.xml_position = note.note_duration.xml_position + note.note_duration.duration
 
         end_position = cal_time_position_with_tempo(end_note, 0, tempos)
-        if note.note_notations.is_trill:
-            note, _ = apply_feat_to_a_note(note, feat, prev_vel)
-            trill_vec = feat.trill_param
-            trill_density = trill_vec[0]
-            last_velocity = trill_vec[1] * note.velocity
-            first_note_ratio = trill_vec[2]
-            last_note_ratio = trill_vec[3]
-            up_trill = trill_vec[4]
-            total_second = end_position - note.note_duration.time_position
-            num_trills = int(trill_density * total_second)
-            first_velocity = note.velocity
+        # if note.note_notations.is_trill:
+        #     note, _ = apply_feat_to_a_note(note, feat, prev_vel)
+        #     trill_vec = feat.trill_param
+        #     trill_density = trill_vec[0]
+        #     last_velocity = trill_vec[1] * note.velocity
+        #     first_note_ratio = trill_vec[2]
+        #     last_note_ratio = trill_vec[3]
+        #     up_trill = trill_vec[4]
+        #     total_second = end_position - note.note_duration.time_position
+        #     num_trills = int(trill_density * total_second)
+        #     first_velocity = note.velocity
 
-            key = get_item_by_xml_position(key_signatures, note)
-            key = key.key
-            final_key = None
-            for acc in trill_accidentals:
-                if acc.xml_position == note.note_duration.xml_position:
-                    if acc.type['content'] == '#':
-                        final_key = 7
-                    elif acc.type['content'] == '♭':
-                        final_key = -7
-                    elif acc.type['content'] == '♮':
-                        final_key = 0
-            measure_accidentals = get_measure_accidentals(xml_notes, i)
-            trill_pitch = note.pitch
-            up_pitch, up_pitch_string = cal_up_trill_pitch(note.pitch, key, final_key, measure_accidentals)
+        #     key = get_item_by_xml_position(key_signatures, note)
+        #     key = key.key
+        #     final_key = None
+        #     for acc in trill_accidentals:
+        #         if acc.xml_position == note.note_duration.xml_position:
+        #             if acc.type['content'] == '#':
+        #                 final_key = 7
+        #             elif acc.type['content'] == '♭':
+        #                 final_key = -7
+        #             elif acc.type['content'] == '♮':
+        #                 final_key = 0
+        #     measure_accidentals = get_measure_accidentals(xml_notes, i)
+        #     trill_pitch = note.pitch
+        #     up_pitch, up_pitch_string = cal_up_trill_pitch(note.pitch, key, final_key, measure_accidentals)
 
-            if up_trill:
-                up = True
-            else:
-                up = False
+        #     if up_trill:
+        #         up = True
+        #     else:
+        #         up = False
 
-            if num_trills > 2:
-                mean_second = total_second / num_trills
-                normal_second = (total_second - mean_second * (first_note_ratio + last_note_ratio)) / (num_trills -2)
-                prev_end = note.note_duration.time_position
-                for j in range(num_trills):
-                    if up:
-                        pitch = (up_pitch_string, up_pitch)
-                        up = False
-                    else:
-                        pitch = trill_pitch
-                        up = True
-                    if j == 0:
-                        note.pitch = pitch
-                        note.note_duration.seconds = mean_second * first_note_ratio
-                        prev_end += mean_second * first_note_ratio
-                    else:
-                        new_note = copy.copy(note)
-                        new_note.pedals = None
-                        new_note.pitch = copy.copy(note.pitch)
-                        new_note.pitch = pitch
-                        new_note.note_duration = copy.copy(note.note_duration)
-                        new_note.note_duration.time_position = prev_end
-                        if j == num_trills -1:
-                            new_note.note_duration.seconds = mean_second * last_note_ratio
-                        else:
-                            new_note.note_duration.seconds = normal_second
-                        new_note.velocity = copy.copy(note.velocity)
-                        new_note.velocity = first_velocity + (last_velocity - first_velocity) * (j / num_trills)
-                        prev_end += new_note.note_duration.seconds
-                        ornaments.append(new_note)
-            elif num_trills == 2:
-                mean_second = total_second / num_trills
-                prev_end = note.note_duration.time_position
-                for j in range(2):
-                    if up:
-                        pitch = (up_pitch_string, up_pitch)
-                        up = False
-                    else:
-                        pitch = trill_pitch
-                        up = True
-                    if j == 0:
-                        note.pitch = pitch
-                        note.note_duration.seconds = mean_second * first_note_ratio
-                        prev_end += mean_second * first_note_ratio
-                    else:
-                        new_note = copy.copy(note)
-                        new_note.pedals = None
-                        new_note.pitch = copy.copy(note.pitch)
-                        new_note.pitch = pitch
-                        new_note.note_duration = copy.copy(note.note_duration)
-                        new_note.note_duration.time_position = prev_end
-                        new_note.note_duration.seconds = mean_second * last_note_ratio
-                        new_note.velocity = copy.copy(note.velocity)
-                        new_note.velocity = last_velocity
-                        prev_end += mean_second * last_note_ratio
-                        ornaments.append(new_note)
-            else:
-                note.note_duration.seconds = total_second
+        #     if num_trills > 2:
+        #         mean_second = total_second / num_trills
+        #         normal_second = (total_second - mean_second * (first_note_ratio + last_note_ratio)) / (num_trills -2)
+        #         prev_end = note.note_duration.time_position
+        #         for j in range(num_trills):
+        #             if up:
+        #                 pitch = (up_pitch_string, up_pitch)
+        #                 up = False
+        #             else:
+        #                 pitch = trill_pitch
+        #                 up = True
+        #             if j == 0:
+        #                 note.pitch = pitch
+        #                 note.note_duration.seconds = mean_second * first_note_ratio
+        #                 prev_end += mean_second * first_note_ratio
+        #             else:
+        #                 new_note = copy.copy(note)
+        #                 new_note.pedals = None
+        #                 new_note.pitch = copy.copy(note.pitch)
+        #                 new_note.pitch = pitch
+        #                 new_note.note_duration = copy.copy(note.note_duration)
+        #                 new_note.note_duration.time_position = prev_end
+        #                 if j == num_trills -1:
+        #                     new_note.note_duration.seconds = mean_second * last_note_ratio
+        #                 else:
+        #                     new_note.note_duration.seconds = normal_second
+        #                 new_note.velocity = copy.copy(note.velocity)
+        #                 new_note.velocity = first_velocity + (last_velocity - first_velocity) * (j / num_trills)
+        #                 prev_end += new_note.note_duration.seconds
+        #                 ornaments.append(new_note)
+        #     elif num_trills == 2:
+        #         mean_second = total_second / num_trills
+        #         prev_end = note.note_duration.time_position
+        #         for j in range(2):
+        #             if up:
+        #                 pitch = (up_pitch_string, up_pitch)
+        #                 up = False
+        #             else:
+        #                 pitch = trill_pitch
+        #                 up = True
+        #             if j == 0:
+        #                 note.pitch = pitch
+        #                 note.note_duration.seconds = mean_second * first_note_ratio
+        #                 prev_end += mean_second * first_note_ratio
+        #             else:
+        #                 new_note = copy.copy(note)
+        #                 new_note.pedals = None
+        #                 new_note.pitch = copy.copy(note.pitch)
+        #                 new_note.pitch = pitch
+        #                 new_note.note_duration = copy.copy(note.note_duration)
+        #                 new_note.note_duration.time_position = prev_end
+        #                 new_note.note_duration.seconds = mean_second * last_note_ratio
+        #                 new_note.velocity = copy.copy(note.velocity)
+        #                 new_note.velocity = last_velocity
+        #                 prev_end += mean_second * last_note_ratio
+        #                 ornaments.append(new_note)
+        #     else:
+        #         note.note_duration.seconds = total_second
 
 
-        else:
-            note.note_duration.seconds = end_position - note.note_duration.time_position
+        # else:
+        #     note.note_duration.seconds = end_position - note.note_duration.time_position
+        note.note_duration.seconds = end_position - note.note_duration.time_position
+        
 
         note, prev_vel = apply_feat_to_a_note(note, feat, prev_vel)
 
