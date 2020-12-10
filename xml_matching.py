@@ -1789,8 +1789,8 @@ def check_pairs(pairs):
 
 def read_xml_to_notes(path):
     xml_name = path + 'musicxml_cleaned.musicxml'
-    if not os.path.isfile(xml_name):
-        xml_name = path + 'xml.xml'
+    # if not os.path.isfile(xml_name):
+    #     xml_name = path + 'xml.xml'
     xml_object = MusicXMLDocument(xml_name)
     xml_notes = get_direction_encoded_notes(xml_object)
 
